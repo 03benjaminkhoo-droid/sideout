@@ -1,0 +1,38 @@
+name: Build apps
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Find the app folder
+        run: |
+          CFG=$(find . -name capacitor.config.json -not -path "*/node_modules/*" -not -path "*/android/*" -not -path "*/ios/*" | head -1)
+          if [ -z "$CFG" ]; then echo "capacitor.config.json not found. Files in the repo:"; ls -R | head -50; exit 1; fi
+          echo "APP=$(dirname "$CFG")" >> "$GITHUB_ENV"
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - uses: actions/setup-java@v5
+        with: { distribution: temurin, java-version: 21 }
+      - run: npm install --no-audit --no-fund
+        working-directory: ${{ env.APP }}
+      - run: npx cap sync android
+        working-directory: ${{ env.APP }}
+      - run: bash ./gradlew assembleDebug
+        working-directory: ${{ env.APP }}/android
+      - name: Publish APK as a download
+        working-directory: ${{ env.APP }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp android/app/build/outputs/apk/debug/app-debug.apk Sideout.apk
+          gh release delete andr
