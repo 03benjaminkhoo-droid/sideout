@@ -35,4 +35,27 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           cp android/app/build/outputs/apk/debug/app-debug.apk Sideout.apk
-          gh release delete andr
+          gh release delete android --yes --cleanup-tag || true
+          gh release create android Sideout.apk --title "Sideout for Android" --notes "Download Sideout.apk on your phone and open it."
+
+  web:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Find the web folder
+        run: |
+          IDX=$(find . -path "*/web/manifest.webmanifest" -not -path "*/node_modules/*" | head -1)
+          if [ -z "$IDX" ]; then echo "web/manifest.webmanifest not found. Files in the repo:"; ls -R | head -50; exit 1; fi
+          echo "WEB=$(dirname "$IDX")" >> "$GITHUB_ENV"
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: ${{ env.WEB }}
+          name: pages-${{ github.run_attempt }}
+      - id: deploy
+        uses: actions/deploy-pages@v4
+        with:
+          artifact_name: pages-${{ github.run_attempt }}
